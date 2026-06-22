@@ -363,7 +363,7 @@ class BasicEmbeddingCache(EmbeddingCache):
                 vectors=d["vectors"],
             )
 
-        if doc["version"] == "0.2.0":
+        if Version.from_string(doc["version"]) >= Version.from_string("0.2.0"):
             return cast(EmbedderResultDocument, doc)
 
         return None

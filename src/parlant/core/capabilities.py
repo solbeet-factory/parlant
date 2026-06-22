@@ -193,19 +193,19 @@ class CapabilityVectorStore(CapabilityStore):
     async def _vector_document_loader(
         self, doc: VectorBaseDocument
     ) -> Optional[CapabilityVectorDocument]:
-        if doc["version"] == self.VERSION.to_string():
+        if Version.from_string(doc["version"]) >= self.VERSION:
             return cast(CapabilityVectorDocument, doc)
         return None
 
     async def _document_loader(self, doc: BaseDocument) -> Optional[CapabilityDocument]:
-        if doc["version"] == self.VERSION.to_string():
+        if Version.from_string(doc["version"]) >= self.VERSION:
             return cast(CapabilityDocument, doc)
         return None
 
     async def _association_document_loader(
         self, doc: BaseDocument
     ) -> Optional[CapabilityTagAssociationDocument]:
-        if doc["version"] == self.VERSION.to_string():
+        if Version.from_string(doc["version"]) >= self.VERSION:
             return cast(CapabilityTagAssociationDocument, doc)
         return None
 

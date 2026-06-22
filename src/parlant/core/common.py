@@ -138,6 +138,16 @@ class Version:
             return NotImplemented
         return self._v > other._v
 
+    def __ge__(self, other: object) -> bool:
+        if not isinstance(other, Version):
+            return NotImplemented
+        return self._v >= other._v
+
+    def __le__(self, other: object) -> bool:
+        if not isinstance(other, Version):
+            return NotImplemented
+        return self._v <= other._v
+
 
 class ItemNotFoundError(Exception):
     def __init__(self, item_id: UniqueId, message: Optional[str] = None) -> None:

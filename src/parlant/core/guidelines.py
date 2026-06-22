@@ -498,7 +498,7 @@ class GuidelineDocumentStore(GuidelineStore):
                 tag_id=d["tag_id"],
             )
 
-        if doc["version"] == "0.5.0":
+        if Version.from_string(doc["version"]) >= Version.from_string("0.5.0"):
             return cast(GuidelineTagAssociationDocument, doc)
 
         return None

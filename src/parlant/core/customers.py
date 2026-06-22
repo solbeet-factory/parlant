@@ -167,7 +167,7 @@ class CustomerDocumentStore(CustomerStore):
         self._lock = ReaderWriterLock()
 
     async def _document_loader(self, doc: BaseDocument) -> Optional[_CustomerDocument]:
-        if doc["version"] == "0.1.0":
+        if Version.from_string(doc["version"]) >= Version.from_string("0.1.0"):
             return cast(_CustomerDocument, doc)
 
         return None
@@ -185,7 +185,7 @@ class CustomerDocumentStore(CustomerStore):
                 tag_id=doc["tag_id"],
             )
 
-        if doc["version"] == "0.2.0":
+        if Version.from_string(doc["version"]) >= Version.from_string("0.2.0"):
             return cast(_CustomerTagAssociationDocument, doc)
 
         return None
