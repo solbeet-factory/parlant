@@ -96,10 +96,14 @@ class MongoDocumentDatabase(DocumentDatabase):
             await self.delete_collection(failed_migrations_collection_name)
 
         failed_migration_collection: Optional[DocumentCollection[TDocument]] = None
-        for doc in await collection_existing_documents.to_list():
+        async for doc in collection_existing_documents:
             try:
+                original_version = doc.get("version")
                 if loaded_doc := await document_loader(doc):
-                    await result_collection.replace_one(doc, loaded_doc)
+                    # Only rewrite if the document was actually migrated (version changed or new dict created)
+                    if loaded_doc is not doc or loaded_doc.get("version") != original_version:
+                        # Use _id for efficient lookup instead of the full document
+                        await result_collection.replace_one({"_id": doc["_id"]}, loaded_doc)
                     continue
 
                 if failed_migration_collection is None:
