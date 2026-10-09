@@ -159,6 +159,11 @@ class OpenAISchematicGenerator(BaseSchematicGenerator[T]):
                 ),
             ),
             retry(InternalServerError, max_exceptions=2, wait_times=(1.0, 5.0)),
+            # The model returned valid JSON that does not match the schema (a
+            # required field missing). Each attempt is a fresh completion and
+            # the model rarely omits the same field twice in a row, so a retry
+            # usually recovers what would otherwise fail the whole turn.
+            retry(ValidationError, max_exceptions=3, wait_times=(0.5, 2.0)),
         ]
     )
     @override
