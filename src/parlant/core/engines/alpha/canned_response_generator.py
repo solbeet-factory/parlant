@@ -80,6 +80,54 @@ from parlant.core.tools import ToolId
 
 DEFAULT_NO_MATCH_CANREP = "Not sure I understand. Could you please say that another way?"
 
+_MAX_CANREP_ID_LENGTH_DIFFERENCE = 2
+"""How many characters longer or shorter a chosen ID may be and still count as a
+mis-transcription of a real one. Wide enough for the observed slips (a missing
+or extra trailing character), narrow enough to reject degenerate outputs."""
+
+
+def resolve_canned_response_id(chosen: str, valid_ids: Sequence[str]) -> Optional[str]:
+    """Resolve a canned response ID chosen by the LLM against the IDs it was offered.
+
+    Canned response IDs are random mixed-case strings that the selection LLM has to
+    copy verbatim, and it occasionally slips: it changes the case, drops the last
+    character or appends one. With an exact comparison a correct choice is then
+    lost and the turn falls back to the no-match response.
+
+    Returns the chosen ID if it is valid; otherwise a valid ID only when exactly ONE
+    candidate is a plausible transcription of it (same ID ignoring case, or one is a
+    prefix of the other, within a small length difference). Returns None when
+    ambiguous or implausible: sending the wrong canned response is worse than none.
+    """
+    if chosen in valid_ids:
+        return chosen
+
+    if not chosen.strip():
+        return None
+
+    def unique(candidates: Iterable[str]) -> Optional[str]:
+        plausible = [
+            v for v in candidates if abs(len(v) - len(chosen)) <= _MAX_CANREP_ID_LENGTH_DIFFERENCE
+        ]
+        return plausible[0] if len(plausible) == 1 else None
+
+    lowered = chosen.lower()
+
+    for candidates in (
+        # Same ID with different capitalization
+        (v for v in valid_ids if v.lower() == lowered),
+        # The LLM dropped trailing characters
+        (v for v in valid_ids if v.startswith(chosen)),
+        # The LLM appended trailing characters
+        (v for v in valid_ids if chosen.startswith(v)),
+        # Both of the above, ignoring capitalization
+        (v for v in valid_ids if v.lower().startswith(lowered) or lowered.startswith(v.lower())),
+    ):
+        if resolved := unique(candidates):
+            return resolved
+
+    return None
+
 
 class NoMatchResponseProvider(ABC):
     async def get_response(self, context: EngineContext, draft: str | None) -> CannedResponse:
@@ -2395,7 +2443,18 @@ Output a JSON object with three properties:
             )
 
         # Step 5.3: Assuming a high-quality match or a partial match in strict mode
-        selected_canrep_id = CannedResponseId(selection_response.content.chosen_template_id)
+        chosen_template_id = selection_response.content.chosen_template_id or ""
+        resolved_template_id = resolve_canned_response_id(
+            chosen_template_id, [canrep.id for canrep, _ in rendered_canreps]
+        )
+
+        if resolved_template_id and resolved_template_id != chosen_template_id:
+            self._logger.warning(
+                f"Canned response ID choice {chosen_template_id!r} is not among the "
+                f"{len(rendered_canreps)} offered templates; resolved to {resolved_template_id!r}"
+            )
+
+        selected_canrep_id = CannedResponseId(resolved_template_id or chosen_template_id)
         rendered_canned_response = next(
             (value for canrep, value in rendered_canreps if canrep.id == selected_canrep_id),
             None,
