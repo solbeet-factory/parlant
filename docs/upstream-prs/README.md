@@ -11,3 +11,4 @@ changes against `develop`, and the PR body to paste.
 | [03](03-manual-mode-precedence.md) | `fix(engine): "manual" wins when tools request conflicting session modes` | draft |
 | [04](04-process-without-status-event.md) | `fix(sessions): process() reports ready when the run emitted no status event` | draft |
 | [05](05-canned-response-id-resolution.md) | `fix(canned): resolve slightly mis-transcribed canned response IDs` | draft |
+| [06](06-openai-schema-validation-retry.md) | `fix(openai): retry when the model's JSON does not match the schema` | draft |
