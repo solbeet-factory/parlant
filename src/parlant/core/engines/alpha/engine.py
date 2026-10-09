@@ -938,6 +938,13 @@ class AlphaEngine(Engine):
             },
         )
 
+        try:
+            await self._hooks.call_on_cancelled(context, self._tracer.trace_id)
+        except Exception as exc:
+            # The run is already cancelled; a failing hook must not turn the
+            # cancellation into a different error.
+            self._logger.warning(f"on_cancelled hook failed: {type(exc).__name__}: {exc}")
+
     async def _call_guideline_handlers(
         self,
         context: EngineContext,

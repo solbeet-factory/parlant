@@ -91,6 +91,15 @@ class EngineHooks:
     on_messages_emitted: list[EngineHook] = field(default_factory=list)
     """Called right after all messages were emitted into the session"""
 
+    on_cancelled: list[EngineHook] = field(default_factory=list)
+    """Called after a processing run was cancelled and its `cancelled` status event was emitted.
+
+    The payload is the trace ID of the cancelled run, so a hook can find the
+    events that run left in the session (e.g. its tool events). Runs are
+    cancelled when new events supersede them or when the server shuts down.
+    Hooks run while the cancellation propagates: they cannot stop it, and
+    their result (and any exception they raise) is ignored."""
+
     on_guideline_match_handlers: dict[
         GuidelineId, list[Callable[[EngineContext, GuidelineMatch], Awaitable[None]]]
     ] = field(default_factory=lambda: defaultdict(list))
@@ -149,6 +158,9 @@ class EngineHooks:
 
     async def call_on_messages_emitted(self, context: EngineContext) -> bool:
         return await self.call_hooks(self.on_messages_emitted, context, None)
+
+    async def call_on_cancelled(self, context: EngineContext, trace_id: str) -> bool:
+        return await self.call_hooks(self.on_cancelled, context, trace_id)
 
     async def call_hooks(
         self,
