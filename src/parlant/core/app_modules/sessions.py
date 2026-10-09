@@ -500,13 +500,48 @@ class SessionModule:
                 requests=requests,
             )
 
-            event, *_ = await self._session_store.list_events(
+            trace_id = self._tracer.trace_id
+
+            message_events = await self._session_store.list_events(
                 session_id=session_id,
-                trace_id=self._tracer.trace_id,
+                trace_id=trace_id,
                 kinds=[EventKind.MESSAGE],
             )
 
-            return event
+            if message_events:
+                return message_events[0]
+
+            # The engine can finish an utterance without emitting any message:
+            # the message composer may produce no events (e.g. a
+            # `_generate_response` override or a hook that drops the message),
+            # and a failed run only emits an error status. `event, *_ = []`
+            # used to raise ValueError here, which the caller saw as an opaque
+            # 500. Report the run's error status if there is one; otherwise
+            # report the utterance as completed without a message.
+            self._logger.warning(
+                f"Session {session_id}: utterance {trace_id} emitted no message event"
+            )
+
+            status_events = await self._session_store.list_events(
+                session_id=session_id,
+                trace_id=trace_id,
+                kinds=[EventKind.STATUS],
+            )
+
+            for status_event in status_events:
+                if (
+                    isinstance(status_event.data, dict)
+                    and status_event.data.get("status") == "error"
+                ):
+                    return status_event
+
+            return await self.create_status_event(
+                session_id=session_id,
+                source=EventSource.SYSTEM,
+                status="ready",
+                data={"reason": "no_message_from_engine", "trace_id": trace_id},
+                metadata=None,
+            )
 
     async def find_events(
         self,
