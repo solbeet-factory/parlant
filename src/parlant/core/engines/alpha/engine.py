@@ -804,6 +804,33 @@ class AlphaEngine(Engine):
             current_session_mode = context.session.mode
             new_session_mode = current_session_mode
 
+            requested_modes = {
+                mode
+                for control_output in tool_call_control_outputs
+                if (mode := control_output.get("mode"))
+            }
+
+            if "manual" in requested_modes and "auto" in requested_modes:
+                # Conflicting requests in the same run (e.g. a hand-off tool and a
+                # resume tool both fired). The order of tool events is decided by
+                # the tool-calling LLM, so "last one wins" would make the outcome
+                # random. Manual wins: a hand-off to a human is never undone in the
+                # same breath it was requested.
+                #
+                # Always write it, even if the run started in manual mode:
+                # `context.session` is the snapshot from the start of the run, and
+                # the tools may have already persisted another mode themselves.
+                self._logger.info(
+                    f"Session {context.session.id}: tools requested both 'manual' and "
+                    "'auto' modes; 'manual' takes precedence"
+                )
+
+                await self._entity_commands.update_session(
+                    session_id=context.session.id,
+                    params={"mode": "manual"},
+                )
+                return
+
             for control_output in tool_call_control_outputs:
                 new_session_mode = control_output.get("mode") or current_session_mode
 
