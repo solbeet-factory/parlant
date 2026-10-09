@@ -453,17 +453,33 @@ class SessionModule:
             timeout=Timeout(60),
         )
 
-        event = next(
-            iter(
-                await self._session_store.list_events(
-                    session_id=session_id,
-                    trace_id=trace_id,
-                    kinds=[EventKind.STATUS],
-                )
-            )
+        status_events = await self._session_store.list_events(
+            session_id=session_id,
+            trace_id=trace_id,
+            kinds=[EventKind.STATUS],
         )
 
-        return event
+        if status_events:
+            return next(iter(status_events))
+
+        # The engine can finish a run without emitting any status event: it
+        # returns early for a session in manual mode, and any hook that bails
+        # out (on_acknowledging, on_preparing, on_generating_messages, ...)
+        # ends the run before the ready event. `next(iter([]))` used to raise
+        # StopIteration here, which surfaces as a RuntimeError and a 500 for
+        # the caller. Report the run as completed without emissions instead.
+        self._logger.warning(
+            f"Session {session_id}: processing run {trace_id} emitted no status event; "
+            "reporting it as ready"
+        )
+
+        return await self.create_status_event(
+            session_id=session_id,
+            source=EventSource.SYSTEM,
+            status="ready",
+            data={"reason": "no_status_from_engine", "trace_id": trace_id},
+            metadata=None,
+        )
 
     async def utter(
         self,
