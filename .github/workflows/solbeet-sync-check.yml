@@ -1,0 +1,66 @@
+# Monthly radar: do the fork's commits still apply on top of upstream, and what
+# did upstream ship since our base? Opens (or comments on) an issue in this repo
+# and fails when a fork commit does not apply on the latest upstream release.
+name: Upstream sync check
+
+on:
+  schedule:
+    - cron: "0 12 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: solbeet/3.3.x
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/emcie-co/parlant.git
+          git fetch --tags upstream develop
+          latest=$(git tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          echo "LATEST_TAG=$latest" >> "$GITHUB_ENV"
+
+      - name: Against the latest upstream release
+        id: release
+        continue-on-error: true
+        run: python scripts/solbeet_sync_check.py --target "$LATEST_TAG" --report report-release.md
+
+      - name: Against upstream develop (informative)
+        continue-on-error: true
+        run: python scripts/solbeet_sync_check.py --target upstream/develop --report report-develop.md
+
+      - name: Report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+        run: |
+          {
+            echo "Latest upstream release: \`$LATEST_TAG\`. Procedure: FORK.md (Sync with upstream)."
+            echo
+            cat report-release.md
+            echo
+            cat report-develop.md
+          } > report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          gh label create upstream-sync --color 0e8a16 --description "Upstream sync radar" --force
+          issue=$(gh issue list --label upstream-sync --state open --json number --jq '.[0].number')
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body-file report.md
+          else
+            gh issue create --title "Upstream sync check" --label upstream-sync --body-file report.md
+          fi
+          test "$RELEASE_OUTCOME" = "success"
