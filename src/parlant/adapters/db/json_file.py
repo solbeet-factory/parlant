@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 import json
+import os
+import time
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Mapping, Optional, Sequence, cast
 from typing_extensions import override, Self
@@ -44,16 +46,51 @@ from parlant.core.persistence.document_database import (
 from parlant.core.loggers import Logger
 
 
+FLUSH_WINDOW_ENV_VAR = "PARLANT_JSON_FLUSH_WINDOW_SECONDS"
+
+
+def _flush_window_from_env() -> float:
+    raw = os.environ.get(FLUSH_WINDOW_ENV_VAR, "").strip()
+    if not raw:
+        return 0.0
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return 0.0
+
+
 class JSONFileDocumentDatabase(DocumentDatabase):
     def __init__(
         self,
         logger: Logger,
         file_path: Path,
+        flush_window_seconds: Optional[float] = None,
     ) -> None:
+        """A document database persisted to a single JSON file.
+
+        `flush_window_seconds` coalesces the per-write flushes: every write
+        operation calls `flush()`, which serializes the WHOLE file, so a burst
+        of N inserts costs O(N^2) bytes of JSON (e.g. the embedding cache
+        while indexing a large agent at startup). With a window > 0, a
+        `flush()` that comes less than that many seconds after the previous
+        one is skipped. Nothing is lost on a clean shutdown: `__aexit__`
+        always writes everything pending. A crash may lose the writes of the
+        last window, so only use it for data that can be rebuilt (caches).
+
+        Defaults to the `PARLANT_JSON_FLUSH_WINDOW_SECONDS` environment
+        variable, or 0 (flush on every write, the original behavior).
+        """
         self.file_path = file_path
 
         self._logger = logger
         self._op_counter = 0
+
+        self._flush_window_seconds = (
+            _flush_window_from_env()
+            if flush_window_seconds is None
+            else max(0.0, flush_window_seconds)
+        )
+        self._last_flush: Optional[float] = None
 
         self._lock = ReaderWriterLock()
 
@@ -64,6 +101,15 @@ class JSONFileDocumentDatabase(DocumentDatabase):
         self._collections: dict[str, JSONFileDocumentCollection[BaseDocument]] = {}
 
     async def flush(self) -> None:
+        if self._flush_window_seconds > 0:
+            now = time.monotonic()
+            if (
+                self._last_flush is not None
+                and (now - self._last_flush) < self._flush_window_seconds
+            ):
+                return
+            self._last_flush = now
+
         async with self._lock.writer_lock:
             await self._flush_unlocked()
 
