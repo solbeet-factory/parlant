@@ -28,13 +28,13 @@ Tags are never moved or deleted: parlant-service pins one. A new fork release is
 Consumers install the tag's source archive (no `git` needed in the image):
 
 ```
-parlant @ https://github.com/solbeet-factory/parlant/archive/refs/tags/v3.3.2-solbeet.2.tar.gz
+parlant @ https://github.com/solbeet-factory/parlant/archive/refs/tags/v3.3.2-solbeet.3.tar.gz
 ```
 
 `parlant.solbeet` exposes `FORK_VERSION` and `FEATURES` (one entry per commit) so the consumer
 can fail at startup if the installed engine is not the fork or lacks a change it relies on.
 
-## Commits on top of v3.3.2 (`v3.3.2-solbeet.2`)
+## Commits on top of v3.3.2 (`v3.3.2-solbeet.3`)
 
 | commit | kind | upstream |
 |---|---|---|
@@ -47,6 +47,7 @@ can fail at startup if the installed engine is not the fork or lacks a change it
 | `fix(sessions)` `process()` without status event reports ready | ours | draft [04](docs/upstream-prs/04-process-without-status-event.md) |
 | `fix(canned)` tolerant canned response ID resolution | ours | draft [05](docs/upstream-prs/05-canned-response-id-resolution.md) |
 | `fix(openai)` retry when the model's JSON does not match the schema (since `.2`) | ours | draft [06](docs/upstream-prs/06-openai-schema-validation-retry.md) |
+| `fix(sessions)` `utter()` without message event reports the run's status (since `.3`) | ours | draft [07](docs/upstream-prs/07-utter-without-message-event.md) |
 | `chore(fork)` version marker | fork only | never (re-done on every sync) |
 | tests, CI, this file | fork only | never |
 
@@ -64,7 +65,7 @@ that changes the code they wrap shows up in parlant-service's suite, not in prod
 | where (parlant-service) | what it patches | why it is not a fork commit |
 |---|---|---|
 | `sdk_patches._patch_canned_sin_eleccion` | wraps the canned selection generator: if the LLM picks no template, emit the one the turn quotes, else the first | product policy (a strict-mode canned beats silence) with a heuristic tied to how our re-contacts are written |
-| `main.py`, NoMatch retry | `CannedResponseGenerator._generate_response`: retry up to 3 times when the result is the no-match template; if it persists, emit **nothing** and alert Slack | product policy: never send the generic "didn't understand" to a lead. The retry and the suppression are one decision; upstream's no-match message is a legitimate default |
+| `main.py`, NoMatch retry | `CannedResponseGenerator._generate_response`: retry up to 3 times when the result is the no-match template; if it persists, emit **nothing** and alert Slack (an utterance that ends this way used to be a 500; since `.3` `utter()` reports `ready`) | product policy: never send the generic "didn't understand" to a lead. The retry and the suppression are one decision; upstream's no-match message is a legitimate default |
 | `canned_tool_dependencies.install` | `CannedResponseGenerator.generate_response`: per turn, enables canned responses whose `lia.required_tool_calls` were satisfied by this turn's tool calls | our spec feature (`requires_tool_calls`) on top of the engine's own `field_dependencies`. It wraps a public method because the `on_generating_messages` hook only runs in `process`, not in `utter` |
 | `observability/generations.instrument` | `BaseSchematicGenerator.generate`: one Langfuse span per LLM call | our observability; it adds no behaviour |
 

@@ -12,3 +12,4 @@ changes against `develop`, and the PR body to paste.
 | [04](04-process-without-status-event.md) | `fix(sessions): process() reports ready when the run emitted no status event` | draft |
 | [05](05-canned-response-id-resolution.md) | `fix(canned): resolve slightly mis-transcribed canned response IDs` | draft |
 | [06](06-openai-schema-validation-retry.md) | `fix(openai): retry when the model's JSON does not match the schema` | draft |
+| [07](07-utter-without-message-event.md) | `fix(sessions): utter() reports the run's status when it emitted no message` | draft |
