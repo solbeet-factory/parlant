@@ -82,7 +82,7 @@ async def test_that_an_utterance_without_messages_reports_ready_instead_of_raisi
             "session_id": "s1",
             "source": EventSource.SYSTEM,
             "status": "ready",
-            "data": {"reason": "no_message_from_engine", "trace_id": "trace-1"},
+            "data": {"reason": "no_message", "trace_id": "trace-1"},
             "metadata": None,
         }
     ]

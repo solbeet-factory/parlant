@@ -535,11 +535,13 @@ class SessionModule:
                 ):
                     return status_event
 
+            # `reason` is a contract with parlant-service's callers (CAIA matches
+            # it strictly): keep it "no_message".
             return await self.create_status_event(
                 session_id=session_id,
                 source=EventSource.SYSTEM,
                 status="ready",
-                data={"reason": "no_message_from_engine", "trace_id": trace_id},
+                data={"reason": "no_message", "trace_id": trace_id},
                 metadata=None,
             )
 

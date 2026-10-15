@@ -21,7 +21,7 @@ We hit it in production with proactive utterances whose reply was intentionally 
 With this PR, when no message event exists `utter()` logs a warning and:
 
 - returns the run's `error` status event if the run failed, or
-- creates a `ready` status event with `data = {"reason": "no_message_from_engine", "trace_id": ...}`,
+- creates a `ready` status event with `data = {"reason": "no_message", "trace_id": ...}`,
 
 so the caller gets a typed result (a status event instead of a message) and can treat the utterance as completed without a message. Same approach as the companion fix for `process()` without a status event.
 
