@@ -28,13 +28,13 @@ Tags are never moved or deleted: parlant-service pins one. A new fork release is
 Consumers install the tag's source archive (no `git` needed in the image):
 
 ```
-parlant @ https://github.com/solbeet-factory/parlant/archive/refs/tags/v3.3.2-solbeet.3.tar.gz
+parlant @ https://github.com/solbeet-factory/parlant/archive/refs/tags/v3.3.2-solbeet.4.tar.gz
 ```
 
 `parlant.solbeet` exposes `FORK_VERSION` and `FEATURES` (one entry per commit) so the consumer
 can fail at startup if the installed engine is not the fork or lacks a change it relies on.
 
-## Commits on top of v3.3.2 (`v3.3.2-solbeet.3`)
+## Commits on top of v3.3.2 (`v3.3.2-solbeet.4`)
 
 | commit | kind | upstream |
 |---|---|---|
@@ -48,6 +48,7 @@ can fail at startup if the installed engine is not the fork or lacks a change it
 | `fix(canned)` tolerant canned response ID resolution | ours | draft [05](docs/upstream-prs/05-canned-response-id-resolution.md) |
 | `fix(openai)` retry when the model's JSON does not match the schema (since `.2`) | ours | draft [06](docs/upstream-prs/06-openai-schema-validation-retry.md) |
 | `fix(sessions)` `utter()` without message event reports the run's status (since `.3`) | ours | draft [07](docs/upstream-prs/07-utter-without-message-event.md) |
+| `fix(sessions)` `utter()` without message: `reason` is `no_message` (since `.4`; was `no_message_from_engine` in `.3`, same contract as parlant-service#116 and CAIA#2401) | ours | folded into draft [07](docs/upstream-prs/07-utter-without-message-event.md) |
 | `chore(fork)` version marker | fork only | never (re-done on every sync) |
 | tests, CI, this file | fork only | never |
 
