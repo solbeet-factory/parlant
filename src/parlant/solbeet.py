@@ -22,7 +22,7 @@ release that lacks a change they rely on. See FORK.md at the repository root.
 FORK = "solbeet-factory/parlant"
 BRANCH = "solbeet/3.3.x"
 UPSTREAM_BASE = "v3.3.2"
-FORK_VERSION = "3.3.2+solbeet.3"
+FORK_VERSION = "3.3.2+solbeet.4"
 
 # One entry per commit on top of UPSTREAM_BASE. Add the entry in the same
 # commit that introduces the change; never reuse a name for something else.
@@ -42,5 +42,7 @@ FEATURES = frozenset(
         "openai-schema-validation-retry",
         # Added in 3.3.2+solbeet.3.
         "utter-without-message-event",
+        # Added in 3.3.2+solbeet.4.
+        "utter-no-message-reason",
     }
 )
