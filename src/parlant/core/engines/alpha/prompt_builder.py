@@ -16,7 +16,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 import dataclasses
 from enum import Enum, auto
-from io import StringIO
 from itertools import chain
 import json
 from typing import Any, Callable, Generic, Mapping, Optional, Sequence, TypeVar, cast
@@ -146,23 +145,49 @@ class PromptBuilder:
         result["metadata"] = {"modified": self._modified}
         return result
 
-    def build(self) -> str:
-        buffer = StringIO()
+    def _render_sections(self) -> list[tuple[str | BuiltInSection, str]]:
+        rendered = []
 
         for section_name, section in self.sections.items():
             try:
-                buffer.write(section.template.format(**section.props))
-                buffer.write("\n\n")
+                rendered.append((section_name, section.template.format(**section.props) + "\n\n"))
             except Exception as e:
                 raise ValueError(
                     f"Error formatting section {section_name} with template: {section.template} and props: {section.props}"
                 ) from e
 
-        prompt = buffer.getvalue().strip()
+        return rendered
+
+    def build(self) -> str:
+        prompt = "".join(text for _, text in self._render_sections()).strip()
 
         self._call_on_build(prompt)
 
         return prompt
+
+    def build_parts(self) -> tuple[str, str]:
+        """Split the built prompt into (stable prefix, rest), with prefix + rest == build().
+
+        The prefix ends after the interaction history and staged events: every call of the
+        same stage within a turn shares it, so it can carry a prompt-cache breakpoint.
+        Without those sections the prefix is empty.
+        """
+        rendered = self._render_sections()
+        cut = max(
+            (
+                i + 1
+                for i, (name, _) in enumerate(rendered)
+                if name in (BuiltInSection.INTERACTION_HISTORY, BuiltInSection.STAGED_EVENTS)
+            ),
+            default=0,
+        )
+        prompt = self.build()
+        prefix = "".join(text for _, text in rendered[:cut]).lstrip()
+
+        if not prefix.strip() or not prompt.startswith(prefix):
+            return "", prompt
+
+        return prefix, prompt[len(prefix) :]
 
     def add_section(
         self,

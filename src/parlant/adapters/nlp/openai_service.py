@@ -13,6 +13,8 @@
 # limitations under the License.
 
 from __future__ import annotations
+import asyncio
+import hashlib
 from itertools import chain
 import re
 import time
@@ -114,8 +116,31 @@ class OpenAIEstimatingTokenizer(EstimatingTokenizer):
         return len(tokens)
 
 
+# Explicit prompt caching (OpenAI-compatible endpoints that support it, e.g. gpt-6-luna on
+# Bedrock): the implicit cache only hits prompts of the exact same length, so batches that
+# share a long prefix never read it. A breakpoint after the shared prefix makes them read it,
+# but only once the first write has started: concurrent calls with the same prefix wait up to
+# this long after the first one (0.3 s was enough when measured, 2026-11-02).
+PROMPT_CACHE_STAGGER_SECONDS = 0.5
+_PROMPT_CACHE_FIRST_SEEN: dict[str, float] = {}
+_PROMPT_CACHE_OPTIONS = {"prompt_cache_options": {"mode": "explicit", "ttl": "30m"}}
+
+
+async def _stagger_shared_prefix(key: str) -> None:
+    now = time.monotonic()
+    for k, t in list(_PROMPT_CACHE_FIRST_SEEN.items()):
+        if now - t > 60:
+            del _PROMPT_CACHE_FIRST_SEEN[k]
+
+    first = _PROMPT_CACHE_FIRST_SEEN.setdefault(key, now)
+    wait = first + PROMPT_CACHE_STAGGER_SECONDS - now
+    if first != now and wait > 0:
+        await asyncio.sleep(wait)
+
+
 class OpenAISchematicGenerator(BaseSchematicGenerator[T]):
     supported_openai_params = ["temperature", "logit_bias", "max_tokens"]
+    prompt_cache_breakpoint = False
     supported_hints = supported_openai_params + ["strict"]
     unsupported_params_by_model: dict[str, list[str]] = {
         "gpt-5": ["temperature"],
@@ -194,16 +219,36 @@ class OpenAISchematicGenerator(BaseSchematicGenerator[T]):
         prompt: str | PromptBuilder,
         hints: Mapping[str, Any] = {},
     ) -> SchematicGenerationResult[T]:
-        if isinstance(prompt, PromptBuilder):
-            prompt = prompt.build()
+        prompt_content: str | list[dict[str, Any]]
+        openai_api_arguments: dict[str, Any] = dict(self._list_arguments(hints))
 
-        openai_api_arguments = self._list_arguments(hints)
+        if isinstance(prompt, PromptBuilder) and self.prompt_cache_breakpoint:
+            prefix, rest = prompt.build_parts()
+            if prefix:
+                prompt_content = [
+                    {
+                        "type": "text",
+                        "text": prefix,
+                        "prompt_cache_breakpoint": {"mode": "explicit"},
+                    },
+                    {"type": "text", "text": rest},
+                ]
+                openai_api_arguments["extra_body"] = _PROMPT_CACHE_OPTIONS
+                await _stagger_shared_prefix(
+                    f"{self.model_name}:{hashlib.sha256(prefix.encode()).hexdigest()}"
+                )
+            else:
+                prompt_content = rest
+        elif isinstance(prompt, PromptBuilder):
+            prompt_content = prompt.build()
+        else:
+            prompt_content = prompt
 
         if hints.get("strict", False):
             t_start = time.time()
             try:
                 response = await self._client.beta.chat.completions.parse(
-                    messages=[{"role": "developer", "content": prompt}],
+                    messages=[{"role": "developer", "content": prompt_content}],  # type: ignore
                     model=self.model_name,
                     response_format=self.schema,
                     **openai_api_arguments,
@@ -243,7 +288,11 @@ class OpenAISchematicGenerator(BaseSchematicGenerator[T]):
                         output_tokens=response.usage.completion_tokens,
                         extra={
                             "cached_input_tokens": response.usage.prompt_tokens_details.cached_tokens
-                            or 0
+                            or 0,
+                            "cache_write_tokens": getattr(
+                                response.usage.prompt_tokens_details, "cache_write_tokens", 0
+                            )
+                            or 0,
                         },
                     ),
                 ),
@@ -253,7 +302,7 @@ class OpenAISchematicGenerator(BaseSchematicGenerator[T]):
             try:
                 t_start = time.time()
                 response = await self._client.chat.completions.create(
-                    messages=[{"role": "developer", "content": prompt}],
+                    messages=[{"role": "developer", "content": prompt_content}],  # type: ignore
                     model=self.model_name,
                     response_format={"type": "json_object"},
                     **openai_api_arguments,
@@ -301,7 +350,11 @@ class OpenAISchematicGenerator(BaseSchematicGenerator[T]):
                             output_tokens=response.usage.completion_tokens,
                             extra={
                                 "cached_input_tokens": response.usage.prompt_tokens_details.cached_tokens
-                                or 0
+                                or 0,
+                                "cache_write_tokens": getattr(
+                                    response.usage.prompt_tokens_details, "cache_write_tokens", 0
+                                )
+                                or 0,
                             },
                         ),
                     ),
