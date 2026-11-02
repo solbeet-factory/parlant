@@ -65,6 +65,9 @@ class _Logger:
     def trace(self, message: str) -> None:
         pass
 
+    def warning(self, message: str) -> None:
+        pass
+
 
 class _Completions:
     def __init__(self) -> None:
@@ -172,3 +175,52 @@ async def test_that_a_concurrent_call_with_the_same_prefix_waits_for_the_first_w
     await generator._do_generate(_builder("g-3"))
 
     assert _no_metrics == [pytest.approx(0.3)]
+
+
+class _RejectsParts(_Completions):
+    async def create(self, **kwargs: Any) -> Any:
+        if "extra_body" in kwargs:
+            self.calls.append(kwargs)
+            raise openai_service.BadRequestError(
+                "bad", response=_response(400), body={"error": {"message": "bad"}}
+            )
+        return await super().create(**kwargs)
+
+
+def _response(status: int) -> Any:
+    import httpx
+
+    return httpx.Response(status, request=httpx.Request("POST", "https://bedrock.test"))
+
+
+async def test_that_a_rejected_breakpoint_is_retried_as_a_plain_prompt() -> None:
+    generator, _ = _generator(breakpoint=True)
+    completions = _RejectsParts()
+    generator._client.chat.completions = completions
+    builder = _builder()
+
+    result = await generator._do_generate(builder)
+
+    assert len(completions.calls) == 2
+    assert "extra_body" in completions.calls[0]
+    assert completions.calls[1]["messages"] == [{"role": "developer", "content": builder.build()}]
+    assert "extra_body" not in completions.calls[1]
+    assert result.content.ok is True
+
+
+async def test_that_a_bad_request_without_breakpoint_is_not_retried() -> None:
+    generator, _ = _generator(breakpoint=False)
+    completions = _RejectsParts()
+
+    async def _always_bad(**kwargs: Any) -> Any:
+        completions.calls.append(kwargs)
+        raise openai_service.BadRequestError(
+            "bad", response=_response(400), body={"error": {"message": "bad"}}
+        )
+
+    completions.create = _always_bad  # type: ignore[method-assign]
+    generator._client.chat.completions = completions
+
+    with pytest.raises(openai_service.BadRequestError):
+        await generator._do_generate(_builder())
+    assert len(completions.calls) == 1
