@@ -29,4 +29,4 @@ def context_variables_to_json(
         for variable, value in context_variables
     }
 
-    return json.dumps(context_values)
+    return json.dumps(context_values, ensure_ascii=False)
