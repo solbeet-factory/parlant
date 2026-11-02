@@ -28,19 +28,20 @@ Tags are never moved or deleted: parlant-service pins one. A new fork release is
 Consumers install the tag's source archive (no `git` needed in the image):
 
 ```
-parlant @ https://github.com/solbeet-factory/parlant/archive/refs/tags/v3.3.2-solbeet.4.tar.gz
+parlant @ https://github.com/solbeet-factory/parlant/archive/refs/tags/v3.3.2-solbeet.5.tar.gz
 ```
 
 `parlant.solbeet` exposes `FORK_VERSION` and `FEATURES` (one entry per commit) so the consumer
 can fail at startup if the installed engine is not the fork or lacks a change it relies on.
 
-## Commits on top of v3.3.2 (`v3.3.2-solbeet.4`)
+## Commits on top of v3.3.2 (`v3.3.2-solbeet.5`)
 
 | commit | kind | upstream |
 |---|---|---|
 | backport #817 tag-association version drift | backport | merged on develop 2026-06-22 |
 | backport #820 Mongo startup migration (streams, rewrites only migrated docs) | backport | merged on develop 2026-06-25 |
 | backport #822 batch deserialization / parallel entity loading (adapted to 3.3.2) | backport | merged on develop 2026-06-26 |
+| backport #823 `ensure_ascii=False` in every `json.dumps` that builds LLM prompt text (since `.5`; accents, ñ and emoji cost ~2x the tokens) | backport | **open** upstream since 2026-07-02 |
 | `perf(db)` optional flush window for `JSONFileDocumentDatabase` | ours | draft [01](docs/upstream-prs/01-json-flush-window.md) |
 | `feat(engine)` `on_cancelled` hook | ours | draft [02](docs/upstream-prs/02-on-cancelled-hook.md) |
 | `fix(engine)` `manual` wins on conflicting session modes | ours | draft [03](docs/upstream-prs/03-manual-mode-precedence.md) |
