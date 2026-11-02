@@ -22,7 +22,7 @@ dependencies = [
     "contextvars>=2.4",
     "croniter>=5.0.1",
     "fastapi>=0.120.0",
-    "fastmcp>=3.2.0",
+    "fastmcp>=3.4.10",
     "griffe<2", # Pinned to <2 because fastmcp (at least v3.2.4) is not compatible with griffe 2.0+ due to breaking changes. Can be removed in case of future fastmcp updates.
     "httpx>=0.28.1",
     "jinja2>=3.1.6",
