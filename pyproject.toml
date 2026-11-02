@@ -95,7 +95,7 @@ vertex = [
 
 ollama = ["ollama>=0.5.0"]
 
-litellm = ["litellm>=1.83.0", "torch>=2.8.0", "transformers>=4.53.0"]
+litellm = ["litellm>=1.100.4", "torch>=2.8.0", "transformers>=4.53.0"]
 
 azure = ["azure-identity>=1.20.0"]
 
