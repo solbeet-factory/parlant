@@ -23,6 +23,7 @@ from openai import (
     APIResponseValidationError,
     APITimeoutError,
     AsyncClient,
+    BadRequestError,
     ConflictError,
     InternalServerError,
     RateLimitError,
@@ -237,6 +238,18 @@ class OpenAISchematicGenerator(BaseSchematicGenerator[T]):
                 await _stagger_shared_prefix(
                     f"{self.model_name}:{hashlib.sha256(prefix.encode()).hexdigest()}"
                 )
+                try:
+                    return await self._request(prompt_content, openai_api_arguments, hints)
+                except BadRequestError as e:
+                    # The breakpoint is an endpoint-specific extension: if the endpoint
+                    # rejects it, the same prompt goes again as a plain string, which is
+                    # exactly the request it would have sent without the option.
+                    self.logger.warning(
+                        f"Prompt-cache breakpoint rejected by {self.model_name} ({e}); "
+                        "retrying without it"
+                    )
+                    openai_api_arguments.pop("extra_body")
+                    prompt_content = prefix + rest
             else:
                 prompt_content = rest
         elif isinstance(prompt, PromptBuilder):
@@ -244,6 +257,14 @@ class OpenAISchematicGenerator(BaseSchematicGenerator[T]):
         else:
             prompt_content = prompt
 
+        return await self._request(prompt_content, openai_api_arguments, hints)
+
+    async def _request(
+        self,
+        prompt_content: str | list[dict[str, Any]],
+        openai_api_arguments: Mapping[str, Any],
+        hints: Mapping[str, Any],
+    ) -> SchematicGenerationResult[T]:
         if hints.get("strict", False):
             t_start = time.time()
             try:
