@@ -708,20 +708,18 @@ class GuidelineDocumentStore(GuidelineStore):
         labels: Optional[Set[str]] = None,
     ) -> Sequence[Guideline]:
         filters: Where = {}
+        excluded_ids: set[str] = set()
 
         async with self._lock.reader_lock:
             if tags is not None:
                 if len(tags) == 0:
-                    guideline_ids = {
+                    # Solbeet fork: untagged = every document minus the tagged ids, as a set
+                    # difference. One `$ne` clause per tagged id made this O(tagged x total)
+                    # (parlant-service#200).
+                    excluded_ids = {
                         doc["guideline_id"]
                         for doc in await self._tag_association_collection.find(filters={})
                     }
-
-                    filters = (
-                        {"$and": [{"id": {"$ne": id}} for id in guideline_ids]}
-                        if guideline_ids
-                        else {}
-                    )
                 else:
                     tag_filters: Where = {"$or": [{"tag_id": {"$eq": tag}} for tag in tags]}
                     tag_associations = await self._tag_association_collection.find(
@@ -734,7 +732,11 @@ class GuidelineDocumentStore(GuidelineStore):
 
                     filters = {"$or": [{"id": {"$eq": id}} for id in guideline_ids]}
 
-            docs = list(await self._collection.find(filters=filters))
+            docs = [
+                d
+                for d in await self._collection.find(filters=filters)
+                if d["id"] not in excluded_ids
+            ]
             guidelines = list(await self._deserialize_batch(docs))
 
             # Filter by labels if specified

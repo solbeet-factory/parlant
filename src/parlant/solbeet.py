@@ -22,7 +22,7 @@ release that lacks a change they rely on. See FORK.md at the repository root.
 FORK = "solbeet-factory/parlant"
 BRANCH = "solbeet/3.3.x"
 UPSTREAM_BASE = "v3.3.2"
-FORK_VERSION = "3.3.2+solbeet.7"
+FORK_VERSION = "3.3.2+solbeet.8"
 
 # One entry per commit on top of UPSTREAM_BASE. Add the entry in the same
 # commit that introduces the change; never reuse a name for something else.
@@ -50,5 +50,7 @@ FEATURES = frozenset(
         "prompt-cache-breakpoint",
         # Added in 3.3.2+solbeet.7.
         "journey-prompts-literal-text",
+        # Added in 3.3.2+solbeet.8.
+        "untagged-listing-linear",
     }
 )
