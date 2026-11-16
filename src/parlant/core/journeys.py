@@ -1051,6 +1051,7 @@ class JourneyVectorStore(JourneyStore):
         condition: Optional[GuidelineId] = None,
     ) -> Sequence[Journey]:
         filters: Where = {}
+        excluded_ids: set[str] = set()
         journey_ids: set[JourneyId] = set()
         condition_journey_ids: set[JourneyId] = set()
 
@@ -1062,14 +1063,14 @@ class JourneyVectorStore(JourneyStore):
                         for doc in await self._tag_association_collection.find(filters={})
                     }
 
-                    if not journey_ids:
-                        filters = {}
+                    # Solbeet fork: untagged = every document minus the tagged ids, as a set
+                    # difference. One `$ne` clause per tagged id made this O(tagged x total)
+                    # (parlant-service#200).
+                    excluded_ids = set(journey_ids)
 
-                    elif len(journey_ids) == 1:
-                        filters = {"id": {"$ne": journey_ids.pop()}}
-
-                    else:
-                        filters = {"$and": [{"id": {"$ne": id}} for id in journey_ids]}
+                    if len(journey_ids) == 1:
+                        # Same state the old `journey_ids.pop()` left for the condition step.
+                        journey_ids.clear()
 
                 else:
                     tag_filters: Where = {"$or": [{"tag_id": {"$eq": tag}} for tag in tags]}
@@ -1102,8 +1103,14 @@ class JourneyVectorStore(JourneyStore):
 
                 if journey_ids:
                     filters = {"$or": [{"id": {"$eq": id}} for id in journey_ids]}
+                    # The explicit ids replace the untagged exclusion, as before.
+                    excluded_ids = set()
 
-            docs = list(await self._collection.find(filters=filters))
+            docs = [
+                d
+                for d in await self._collection.find(filters=filters)
+                if d["id"] not in excluded_ids
+            ]
             return list(await self._deserialize_batch(docs))
 
     @override

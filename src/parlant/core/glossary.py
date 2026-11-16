@@ -398,20 +398,18 @@ class GlossaryVectorStore(GlossaryStore):
         tags: Optional[Sequence[TagId]] = None,
     ) -> Sequence[Term]:
         filters: Where = {}
+        excluded_ids: set[str] = set()
 
         async with self._lock.reader_lock:
             if tags is not None:
                 if len(tags) == 0:
-                    term_ids = {
+                    # Solbeet fork: untagged = every document minus the tagged ids, as a set
+                    # difference. One `$ne` clause per tagged id made this O(tagged x total)
+                    # (parlant-service#200).
+                    excluded_ids = {
                         doc["term_id"]
                         for doc in await self._association_collection.find(filters={})
                     }
-                    if not term_ids:
-                        filters = {}
-                    elif len(term_ids) == 1:
-                        filters = {"id": {"$ne": term_ids.pop()}}
-                    else:
-                        filters = {"$and": [{"id": {"$ne": id}} for id in term_ids]}
 
                 else:
                     tag_filters: Where = {"$or": [{"tag_id": {"$eq": tag}} for tag in tags]}
@@ -427,7 +425,9 @@ class GlossaryVectorStore(GlossaryStore):
                         filters = {"$or": [{"id": {"$eq": id}} for id in term_ids]}
 
             return [
-                await self._deserialize(d) for d in await self._collection.find(filters=filters)
+                await self._deserialize(d)
+                for d in await self._collection.find(filters=filters)
+                if d["id"] not in excluded_ids
             ]
 
     @override

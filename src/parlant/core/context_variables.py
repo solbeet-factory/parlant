@@ -571,19 +571,18 @@ class ContextVariableDocumentStore(ContextVariableStore):
         tags: Optional[Sequence[TagId]] = None,
     ) -> Sequence[ContextVariable]:
         filters: Where = {}
+        excluded_ids: set[str] = set()
 
         async with self._lock.reader_lock:
             if tags is not None:
                 if len(tags) == 0:
-                    variable_ids = {
+                    # Solbeet fork: untagged = every document minus the tagged ids, as a set
+                    # difference. One `$ne` clause per tagged id made this O(tagged x total)
+                    # (parlant-service#200).
+                    excluded_ids = {
                         doc["variable_id"]
                         for doc in await self._variable_tag_association_collection.find(filters={})
                     }
-                    filters = (
-                        {"$and": [{"id": {"$ne": id}} for id in variable_ids]}
-                        if variable_ids
-                        else {}
-                    )
                 else:
                     tag_filters: Where = {"$or": [{"tag_id": {"$eq": tag}} for tag in tags]}
                     tag_associations = await self._variable_tag_association_collection.find(
@@ -599,6 +598,7 @@ class ContextVariableDocumentStore(ContextVariableStore):
             return [
                 await self._deserialize_context_variable(d)
                 for d in await self._variable_collection.find(filters=filters)
+                if d["id"] not in excluded_ids
             ]
 
     @override
