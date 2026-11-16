@@ -201,12 +201,17 @@ EXAMPLES
         )
 
         builder.add_section(
+            # Solbeet fork (parlant-service#192): journey text travels in props, so
+            # braces in it are not parsed by str.format.
             name="relative-action-proposer-journey-steps",
-            template=self.get_journey_text(
-                examined_journey,
-                step_guidelines,
-                journey_conditions,
-            ),
+            template="{journey_steps}",
+            props={
+                "journey_steps": self.get_journey_text(
+                    examined_journey,
+                    step_guidelines,
+                    journey_conditions,
+                )
+            },
         )
 
         builder.add_section(

@@ -793,16 +793,21 @@ Example section is over. The following is the real data you need to use for your
             template="The following is the journey you are now traversing. Read it carefully and ensure to understand which steps follow which:",
         )
         builder.add_section(
+            # Solbeet fork (parlant-service#192): journey text travels in props, so
+            # braces in it are not parsed by str.format.
             name="journey-step-selection-journey-steps",
-            template=get_journey_transition_map_text(
-                nodes=self._node_wrappers,
-                journey_title=self._examined_journey.title,
-                previous_path=self._previous_path,
-                journey_conditions=self._journey_conditions,
-                journey_description=self._examined_journey.description,
-                print_customer_action_description=True,
-                to_prune=True,
-            ),
+            template="{journey_steps}",
+            props={
+                "journey_steps": get_journey_transition_map_text(
+                    nodes=self._node_wrappers,
+                    journey_title=self._examined_journey.title,
+                    previous_path=self._previous_path,
+                    journey_conditions=self._journey_conditions,
+                    journey_description=self._examined_journey.description,
+                    print_customer_action_description=True,
+                    to_prune=True,
+                )
+            },
         )
         builder.add_section(
             name="journey-step-selection-output-format",
