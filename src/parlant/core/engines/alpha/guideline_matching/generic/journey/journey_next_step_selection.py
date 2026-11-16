@@ -635,14 +635,19 @@ Example section is over. The following is the real data you need to use for your
         builder.add_staged_tool_events(self._context.staged_events)
 
         builder.add_section(
+            # Solbeet fork (parlant-service#192): journey text travels in props, so
+            # braces in it are not parsed by str.format.
             name="journey-next-step-selection-journey-steps",
-            template=self.get_journey_transition_map_text(
-                current_node=self._current_node,
-                follow_up_conditions=self._follow_up_conditions,
-                journey_title=self._examined_journey.title,
-                journey_description=self._examined_journey.description,
-                journey_conditions=self._journey_conditions,
-            ),
+            template="{journey_steps}",
+            props={
+                "journey_steps": self.get_journey_transition_map_text(
+                    current_node=self._current_node,
+                    follow_up_conditions=self._follow_up_conditions,
+                    journey_title=self._examined_journey.title,
+                    journey_description=self._examined_journey.description,
+                    journey_conditions=self._journey_conditions,
+                )
+            },
         )
         builder.add_section(
             name="journey-next-step-selection-output-format",

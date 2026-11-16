@@ -439,16 +439,21 @@ Example section is over. The following is the real data you need to use for your
         builder.add_staged_tool_events(self._context.staged_events)
 
         builder.add_section(
+            # Solbeet fork (parlant-service#192): journey text travels in props, so
+            # braces in it are not parsed by str.format.
             name="journey-backtrack-check-journey-steps",
-            template=self._get_journey_transition_map_text(
-                nodes=self._node_wrappers,
-                journey_title=self._examined_journey.title,
-                previous_path=self._previous_path,
-                journey_conditions=self._journey_conditions,
-                journey_description=self._examined_journey.description,
-                print_customer_action_description=True,
-                to_prune=True,
-            ),
+            template="{journey_steps}",
+            props={
+                "journey_steps": self._get_journey_transition_map_text(
+                    nodes=self._node_wrappers,
+                    journey_title=self._examined_journey.title,
+                    previous_path=self._previous_path,
+                    journey_conditions=self._journey_conditions,
+                    journey_description=self._examined_journey.description,
+                    print_customer_action_description=True,
+                    to_prune=True,
+                )
+            },
         )
         builder.add_section(
             name="journey-backtrack-check-output-format",

@@ -589,11 +589,16 @@ Example section is over. The following is the real data you need to use for your
         )
 
         builder.add_section(
+            # Solbeet fork (parlant-service#192): journey text travels in props, so
+            # braces in it are not parsed by str.format.
             name="journey-reachable-nodes-evaluation-node-and-children-description",
-            template=self.get_children_info_description(
-                node=node,
-                children_info=children_info,
-            ),
+            template="{node_and_children}",
+            props={
+                "node_and_children": self.get_children_info_description(
+                    node=node,
+                    children_info=children_info,
+                )
+            },
         )
         builder.add_section(
             name="journey-reachable-nodes-evaluation-output-format",
