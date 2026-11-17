@@ -28,13 +28,13 @@ Tags are never moved or deleted: parlant-service pins one. A new fork release is
 Consumers install the tag's source archive (no `git` needed in the image):
 
 ```
-parlant @ https://github.com/solbeet-factory/parlant/archive/refs/tags/v3.3.2-solbeet.8.tar.gz
+parlant @ https://github.com/solbeet-factory/parlant/archive/refs/tags/v3.3.2-solbeet.9.tar.gz
 ```
 
 `parlant.solbeet` exposes `FORK_VERSION` and `FEATURES` (one entry per commit) so the consumer
 can fail at startup if the installed engine is not the fork or lacks a change it relies on.
 
-## Commits on top of v3.3.2 (`v3.3.2-solbeet.8`)
+## Commits on top of v3.3.2 (`v3.3.2-solbeet.9`)
 
 | commit | kind | upstream |
 |---|---|---|
@@ -52,6 +52,7 @@ can fail at startup if the installed engine is not the fork or lacks a change it
 | `perf(openai)` optional explicit prompt-cache breakpoint after the shared prefix (history + staged events), with a 0.5 s stagger for concurrent calls and one retry without it if the endpoint answers 400 (since `.6`; gpt-6-luna on Bedrock only reads its implicit cache with prompts of identical length) | ours | not drafted yet: upstream has no explicit-cache support to hang it on |
 | `fix(journeys)` journey text (title, description, conditions, step actions, transition conditions) goes in the prompt section's props, not its template, so braces written by the author are not parsed by `str.format` (since `.7`; with them the journey evaluation failed with KeyError and the journey never advanced, parlant-service#192) | ours | not drafted yet: upstream 4.x rewrote these prompts |
 | `perf(stores)` untagged listings (`list_*(tags=[])`) as a set difference instead of one `$ne` clause per tagged id: canned responses, guidelines, journeys, glossary, context variables (since `.8`; O(tagged x total) cost ~12 s per turn with ~100 agents in one pod, parlant-service#200) | ours | draft [08](docs/upstream-prs/08-untagged-listing-linear.md) |
+| `perf(canned)` opt-in `canned_direct` guideline metadata: a lone matched guideline with exactly one eligible canned response, no tools, no journeys and nothing staged sends that response verbatim, without drafting or selecting (since `.9`; ~3 s per such turn, 11 of 47 real webchat turns of one account, parlant-service#207) | ours | not drafted yet |
 | `fix(sessions)` `utter()` without message: `reason` is `no_message` (since `.4`; was `no_message_from_engine` in `.3`, same contract as parlant-service#116 and CAIA#2401) | ours | folded into draft [07](docs/upstream-prs/07-utter-without-message-event.md) |
 | `chore(fork)` version marker | fork only | never (re-done on every sync) |
 | tests, CI, this file | fork only | never |

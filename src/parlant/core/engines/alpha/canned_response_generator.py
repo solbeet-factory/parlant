@@ -219,6 +219,11 @@ class _CannedResponseRenderResult:
     rendered_text: str | None
 
 
+# Solbeet fork (canned-direct): guideline metadata key that opts a guideline into being
+# answered with its only canned response as-is, without drafting or selecting.
+DIRECT_CANNED_METADATA_KEY = "canned_direct"
+
+
 @dataclass(frozen=True)
 class _CannedResponseSelectionResult:
     message: str
@@ -2212,6 +2217,12 @@ Output a JSON object with three properties:
         composition_mode: CompositionMode,
         temperature: float,
     ) -> tuple[Mapping[str, GenerationInfo], Optional[_CannedResponseSelectionResult]]:
+        # Solbeet fork (canned-direct): a lone opted-in guideline sends its canned response
+        # verbatim; drafting and selecting would only end up choosing that same text.
+        if direct := await self._direct_canned_response(context, canned_responses):
+            self._logger.debug("Sending the guideline's canned response directly (canned-direct)")
+            return {}, direct
+
         # This will be needed throughout the process for emitting status events
         direct_draft_output_mode = (
             not canned_responses and composition_mode != CompositionMode.CANNED_STRICT
@@ -2491,6 +2502,53 @@ Output a JSON object with three properties:
             draft=draft_response.content.response_body,
             rendered_canned_responses=rendered_canreps,
             chosen_canned_responses=[(selected_canrep_id, rendered_canned_response)],
+        )
+
+    async def _direct_canned_response(
+        self,
+        context: CannedResponseContext,
+        canned_responses: Sequence[CannedResponse],
+    ) -> Optional[_CannedResponseSelectionResult]:
+        """The canned response to send as-is, or None to run the normal draft + selection.
+
+        Only when nothing else could change the answer: exactly one ordinary guideline
+        matched and it opted in, no tool-enabled guidelines, no active journeys, nothing
+        staged in this turn, and exactly one of its canned responses is eligible now.
+        """
+        if (
+            len(context.ordinary_guideline_matches) != 1
+            or context.tool_enabled_guideline_matches
+            or context.journeys
+            or context.staged_tool_events
+            or context.staged_message_events
+        ):
+            return None
+
+        guideline = context.ordinary_guideline_matches[0].guideline
+        if guideline.metadata.get(DIRECT_CANNED_METADATA_KEY) is not True:
+            return None
+
+        eligible = {r.id for r in canned_responses}
+        own = [
+            r
+            for r in await self._entity_queries.find_canned_responses_for_guidelines(
+                guidelines=[guideline]
+            )
+            if r.id in eligible
+        ]
+        if len(own) != 1:
+            return None
+
+        rendered = (await self._render_responses(context=context, responses=own))[0]
+        if rendered.failed or not rendered.rendered_text:
+            return None
+
+        text = str(rendered.rendered_text)
+        return _CannedResponseSelectionResult(
+            message=text,
+            draft=None,
+            rendered_canned_responses=[(own[0], text)],
+            chosen_canned_responses=[(own[0].id, text)],
         )
 
     async def _render_responses(
